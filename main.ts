@@ -7,8 +7,17 @@ const DELHIVERY_API_KEY = Deno.env.get("DELHIVERY_API_KEY");
 if (!DELHIVERY_API_KEY) {
   console.error("❌ DELHIVERY_API_KEY not found");
 }
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+  return new Response(null, { headers: corsHeaders });
+}
+
   const url = new URL(req.url);
   const method = req.method;
 
@@ -39,7 +48,8 @@ serve(async (req) => {
       );
 
       const data = await response.json();
-      return Response.json(data);
+      return Response.json(data, { headers: corsHeaders });
+
     } catch (err) {
       return Response.json(
         { error: "Delhivery Create Order Failed", details: err.message },
@@ -65,7 +75,8 @@ serve(async (req) => {
       );
 
       const data = await response.json();
-      return Response.json(data);
+      return Response.json(data, { headers: corsHeaders });
+
     } catch (err) {
       return Response.json(
         { error: "Tracking Failed", details: err.message },
@@ -94,7 +105,8 @@ serve(async (req) => {
       );
 
       const data = await response.json();
-      return Response.json(data);
+      return Response.json(data, { headers: corsHeaders });
+
     } catch (err) {
       return Response.json(
         { error: "Cancel Failed", details: err.message },
