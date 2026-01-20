@@ -14,9 +14,14 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const headers = new Headers({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  });
   if (req.method === "OPTIONS") {
-  return new Response(null, { headers: corsHeaders });
-}
+    return new Response(null, { status: 204, headers });
+  }
 
   const url = new URL(req.url);
   const method = req.method;
@@ -53,7 +58,7 @@ serve(async (req) => {
     } catch (err) {
       return Response.json(
         { error: "Delhivery Create Order Failed", details: err.message },
-        { status: 500 }
+        { status: 500 , headers}
       );
     }
   }
@@ -114,6 +119,45 @@ serve(async (req) => {
       );
     }
   }
+  // ==============================
+// ASSIGN AWB
+// ==============================
+if (url.pathname === "/assign-awb" && method === "POST") {
+  try {
+    const body = await req.json();
+
+    if (!body.order_id) {
+      return Response.json(
+        { error: "order_id is required" },
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch(
+      "https://track.delhivery.com/api/p/edit",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Token ${DELHIVERY_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          order_id: body.order_id,
+          action: "assign"
+        })
+      }
+    );
+
+    const data = await response.json();
+    return Response.json(data);
+  } catch (err) {
+    return Response.json(
+      { error: "AWB Assignment Failed", details: err.message },
+      { status: 500 }
+    );
+  }
+}
+
 
   return new Response("Not Found", { status: 404 });
 });
