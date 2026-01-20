@@ -148,7 +148,21 @@ if (url.pathname === "/assign-awb" && method === "POST") {
       }
     );
 
-    const data = await response.json();
+    const text = await response.text();
+
+let data;
+try {
+  data = JSON.parse(text);
+} catch {
+  return Response.json(
+    {
+      error: "Delhivery returned non-JSON response",
+      raw: text
+    },
+    { status: 500, headers }
+  );
+}
+
     return Response.json(data , { headers: corsHeaders });
   } catch (err) {
     return Response.json(
