@@ -129,7 +129,7 @@ if (url.pathname === "/assign-awb" && method === "POST") {
     if (!body.order_id) {
       return Response.json(
         { error: "order_id is required" },
-        { status: 400 }
+        { status: 400 , headers}
       );
     }
 
@@ -149,11 +149,11 @@ if (url.pathname === "/assign-awb" && method === "POST") {
     );
 
     const data = await response.json();
-    return Response.json(data);
+    return Response.json(data , { headers: corsHeaders });
   } catch (err) {
     return Response.json(
       { error: "AWB Assignment Failed", details: err.message },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
