@@ -1,5 +1,4 @@
 // @ts-nocheck
-
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const DELHIVERY_API_KEY = Deno.env.get("DELHIVERY_API_KEY");
@@ -7,35 +6,61 @@ const DELHIVERY_API_KEY = Deno.env.get("DELHIVERY_API_KEY");
 if (!DELHIVERY_API_KEY) {
   console.error("❌ DELHIVERY_API_KEY not found");
 }
+
+/* ==============================
+   CORS HEADERS
+============================== */
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
 serve(async (req) => {
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  });
+  // Handle preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   const url = new URL(req.url);
   const method = req.method;
 
-  // ==============================
-  // Health Check
-  // ==============================
+  /* ==============================
+     HEALTH CHECK
+  ============================== */
   if (url.pathname === "/" && method === "GET") {
-    return new Response("ShreeJee Delhivery Proxy Running ✅");
+    return new Response("ShreeJee Delhivery Proxy Running ✅", {
+      headers: corsHeaders,
+    });
   }
 
-  // ==============================
-  // CREATE ORDER / MANIFEST
-  // ==============================
+  /* ==============================
+     GET AWB (PREFETCH WAYBILL)
+  ============================== */
+  if (url.pathname === "/get-awb" && method === "GET") {
+    try {
+      const response = await fetch(
+        "https://track.delhivery.com/waybill/api/fetch/json/?count=1",
+        {
+          headers: {
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      return Response.json(data, { headers: corsHeaders });
+    } catch (err) {
+      return Response.json(
+        { error: "Failed to fetch AWB", details: err.message },
+        { status: 500, headers: corsHeaders }
+      );
+    }
+  }
+
+  /* ==============================
+     CREATE ORDER / MANIFEST
+  ============================== */
   if (url.pathname === "/create-order" && method === "POST") {
     try {
       const body = await req.json();
@@ -45,27 +70,65 @@ serve(async (req) => {
         {
           method: "POST",
           headers: {
-            "Authorization": `Token ${DELHIVERY_API_KEY}`,
-            "Content-Type": "application/json"
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+        }
+      );
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+
+      return Response.json(data, { headers: corsHeaders });
+    } catch (err) {
+      return Response.json(
+        { error: "Create Order Failed", details: err.message },
+        { status: 500, headers: corsHeaders }
+      );
+    }
+  }
+
+  /* ==============================
+     PINCODE SERVICEABILITY
+  ============================== */
+  if (url.pathname === "/serviceability" && method === "GET") {
+    try {
+      const pin = url.searchParams.get("pin");
+      if (!pin) {
+        return Response.json(
+          { error: "pin is required" },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      const response = await fetch(
+        `https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pin}`,
+        {
+          headers: {
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+          },
         }
       );
 
       const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
-
     } catch (err) {
       return Response.json(
-        { error: "Delhivery Create Order Failed", details: err.message },
-        { status: 500 , headers}
+        { error: "Serviceability check failed", details: err.message },
+        { status: 500, headers: corsHeaders }
       );
     }
   }
 
-  // ==============================
-  // TRACK ORDER
-  // ==============================
+  /* ==============================
+     TRACK SHIPMENT
+  ============================== */
   if (url.pathname.startsWith("/track/") && method === "GET") {
     try {
       const awb = url.pathname.split("/")[2];
@@ -74,26 +137,25 @@ serve(async (req) => {
         `https://track.delhivery.com/api/v1/packages/json/?waybill=${awb}`,
         {
           headers: {
-            "Authorization": `Token ${DELHIVERY_API_KEY}`
-          }
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+          },
         }
       );
 
       const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
-
     } catch (err) {
       return Response.json(
-        { error: "Tracking Failed", details: err.message },
-        { status: 500 }
+        { error: "Tracking failed", details: err.message },
+        { status: 500, headers: corsHeaders }
       );
     }
   }
 
-  // ==============================
-  // CANCEL ORDER
-  // ==============================
-  if (url.pathname === "/cancel" && method === "POST") {
+  /* ==============================
+     UPDATE SHIPMENT
+  ============================== */
+  if (url.pathname === "/update-shipment" && method === "POST") {
     try {
       const body = await req.json();
 
@@ -102,76 +164,54 @@ serve(async (req) => {
         {
           method: "POST",
           headers: {
-            "Authorization": `Token ${DELHIVERY_API_KEY}`,
-            "Content-Type": "application/json"
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
         }
       );
 
       const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
-
     } catch (err) {
       return Response.json(
-        { error: "Cancel Failed", details: err.message },
-        { status: 500 }
+        { error: "Shipment update failed", details: err.message },
+        { status: 500, headers: corsHeaders }
       );
     }
   }
-  // ==============================
-// ASSIGN AWB
-// ==============================
-if (url.pathname === "/assign-awb" && method === "POST") {
-  try {
-    const body = await req.json();
 
-    if (!body.order_id) {
+  /* ==============================
+     CANCEL SHIPMENT
+  ============================== */
+  if (url.pathname === "/cancel-shipment" && method === "POST") {
+    try {
+      const body = await req.json();
+
+      const response = await fetch(
+        "https://track.delhivery.com/api/p/edit",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...body,
+            action: "cancel",
+          }),
+        }
+      );
+
+      const data = await response.json();
+      return Response.json(data, { headers: corsHeaders });
+    } catch (err) {
       return Response.json(
-        { error: "order_id is required" },
-        { status: 400 , headers}
+        { error: "Cancel shipment failed", details: err.message },
+        { status: 500, headers: corsHeaders }
       );
     }
-
-    const response = await fetch(
-      "https://track.delhivery.com/api/p/edit",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Token ${DELHIVERY_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          order_id: body.order_id,
-          action: "assign"
-        })
-      }
-    );
-
-    const text = await response.text();
-
-let data;
-try {
-  data = JSON.parse(text);
-} catch {
-  return Response.json(
-    {
-      error: "Delhivery returned non-JSON response",
-      raw: text
-    },
-    { status: 500, headers }
-  );
-}
-
-    return Response.json(data , { headers: corsHeaders });
-  } catch (err) {
-    return Response.json(
-      { error: "AWB Assignment Failed", details: err.message },
-      { status: 500, headers }
-    );
   }
-}
 
-
-  return new Response("Not Found", { status: 404 });
+  return new Response("Not Found", { status: 404, headers: corsHeaders });
 });
