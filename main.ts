@@ -52,17 +52,19 @@ if (url.pathname === "/fetch-waybills" && method === "POST") {
 
     const text = await response.text();
 
-    // 🧠 Parse XML manually
-    const matches = [...text.matchAll(/<wb>(\d+)<\/wb>/g)];
-    const waybills = matches.map(m => m[1]);
-    console.log("RAW WAYBILL RESPONSE:", text);
+    const waybills = text
+      .replace(/"/g, "")
+      .split(",")
+      .map(wb => wb.trim())
+      .filter(Boolean);
 
+    console.log("Fetched waybills:", waybills.length);
 
     return Response.json(
-      { waybill: waybills },
+      { waybills, count: waybills.length },
       { headers: corsHeaders }
     );
-      
+
   } catch (err) {
     return Response.json(
       { error: "Waybill fetch failed", details: err.message },
