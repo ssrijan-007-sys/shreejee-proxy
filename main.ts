@@ -34,29 +34,45 @@ serve(async (req) => {
     });
   }
 
-  /* ==============================
-     GET AWB (PREFETCH WAYBILL)
-  ============================== */
-  if (url.pathname === "/get-awb" && method === "GET") {
-    try {
-      const response = await fetch(
-        "https://track.delhivery.com/waybill/api/fetch/json/?count=1",
-        {
-          headers: {
-            Authorization: `Token ${DELHIVERY_API_KEY}`,
-          },
-        }
-      );
+ // ==============================
+// FETCH BULK WAYBILLS
+// ==============================
+if (url.pathname === "/fetch-waybills" && method === "POST") {
+  try {
+    const body = await req.json();
+    const count = body.count || 100;
 
-      const data = await response.json();
-      return Response.json(data, { headers: corsHeaders });
-    } catch (err) {
+    const response = await fetch(
+      `https://track.delhivery.com/waybill/api/bulk/json/?count=${count}`,
+      {
+        headers: {
+          "Authorization": `Token ${DELHIVERY_API_KEY}`
+        }
+      }
+    );
+
+    const text = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
       return Response.json(
-        { error: "Failed to fetch AWB", details: err.message },
+        { error: "Non JSON response", raw: text },
         { status: 500, headers: corsHeaders }
       );
     }
+
+    return Response.json(data, { headers: corsHeaders });
+
+  } catch (err) {
+    return Response.json(
+      { error: "Waybill Fetch Failed", details: err.message },
+      { status: 500, headers: corsHeaders }
+    );
   }
+}
+
 
   /* ==============================
      CREATE ORDER / MANIFEST
