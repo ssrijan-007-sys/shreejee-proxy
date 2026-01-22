@@ -35,43 +35,40 @@ serve(async (req) => {
   }
 
  // ==============================
-// FETCH BULK WAYBILLS
+// FETCH WAYBILLS (BULK)
 // ==============================
 if (url.pathname === "/fetch-waybills" && method === "POST") {
   try {
-    const body = await req.json();
-    const count = body.count || 100;
+    const { count } = await req.json();
 
     const response = await fetch(
       `https://track.delhivery.com/waybill/api/bulk/json/?count=${count}`,
       {
         headers: {
-          "Authorization": `Token ${DELHIVERY_API_KEY}`
-        }
+          Authorization: `Token ${DELHIVERY_API_KEY}`,
+        },
       }
     );
 
     const text = await response.text();
 
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      return Response.json(
-        { error: "Non JSON response", raw: text },
-        { status: 500, headers: corsHeaders }
-      );
-    }
+    // 🧠 Parse XML manually
+    const matches = [...text.matchAll(/<wb>(\d+)<\/wb>/g)];
+    const waybills = matches.map(m => m[1]);
 
-    return Response.json(data, { headers: corsHeaders });
+    return Response.json(
+      { waybill: waybills },
+      { headers: corsHeaders }
+    );
 
   } catch (err) {
     return Response.json(
-      { error: "Waybill Fetch Failed", details: err.message },
+      { error: "Waybill fetch failed", details: err.message },
       { status: 500, headers: corsHeaders }
     );
   }
 }
+
 
 
   /* ==============================
