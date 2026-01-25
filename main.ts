@@ -76,40 +76,48 @@ if (url.pathname === "/fetch-waybills" && method === "POST") {
 
 
   /* ==============================
-     CREATE ORDER / MANIFEST
-  ============================== */
-  if (url.pathname === "/create-order" && method === "POST") {
-    try {
-      const body = await req.json();
+   CREATE ORDER / MANIFEST
+============================== */
+if (url.pathname === "/create-order" && method === "POST") {
+  try {
+    const body = await req.json();
 
-      const response = await fetch(
-        "https://track.delhivery.com/api/cmu/create.json",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Token ${DELHIVERY_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
+    // 🔹 LOG BODY RECEIVED
+    console.log("📦 /create-order received payload:", JSON.stringify(body, null, 2));
 
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { raw: text };
+    const response = await fetch(
+      "https://track.delhivery.com/api/cmu/create.json",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${DELHIVERY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       }
+    );
 
-      return Response.json(data, { headers: corsHeaders });
-    } catch (err) {
-      return Response.json(
-        { error: "Create Order Failed", details: err.message },
-        { status: 500, headers: corsHeaders }
-      );
+    const text = await response.text();
+
+    // 🔹 LOG DELHIVERY RESPONSE
+    console.log("📤 Delhivery response:", text);
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
     }
+
+    return Response.json(data, { headers: corsHeaders });
+  } catch (err) {
+    console.error("❌ /create-order failed:", err);
+    return Response.json(
+      { error: "Create Order Failed", details: err.message },
+      { status: 500, headers: corsHeaders }
+    );
   }
+}
 
   /* ==============================
      PINCODE SERVICEABILITY
