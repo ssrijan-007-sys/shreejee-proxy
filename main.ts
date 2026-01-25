@@ -29,7 +29,7 @@ serve(async (req) => {
      HEALTH CHECK
   ============================== */
   if (url.pathname === "/" && method === "GET") {
-    return new Response("ShreeJee Delhivery Proxy Running ✅", {
+    return new Response("ShreeJee Delhivery Proxy Running Successfully✅", {
       headers: corsHeaders,
     });
   }
