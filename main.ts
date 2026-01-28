@@ -82,8 +82,11 @@ if (url.pathname === "/create-order" && method === "POST") {
   try {
     const body = await req.json();
 
-    // 🔹 LOG BODY RECEIVED
-    console.log("📦 /create-order received payload:", JSON.stringify(body, null, 2));
+    console.log("📦 /create-order received payload:", body);
+
+    const formBody =
+      "format=json&data=" +
+      encodeURIComponent(JSON.stringify(body));
 
     const response = await fetch(
       "https://track.delhivery.com/api/cmu/create.json",
@@ -91,17 +94,14 @@ if (url.pathname === "/create-order" && method === "POST") {
         method: "POST",
         headers: {
           Authorization: `Token ${DELHIVERY_API_KEY}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json"
         },
-        body: JSON.stringify(body),
+        body: formBody
       }
     );
 
     const text = await response.text();
-
-    // 🔹 LOG DELHIVERY RESPONSE
-    console.log("📤 Delhivery response:", text);
-
     let data;
     try {
       data = JSON.parse(text);
@@ -109,9 +109,12 @@ if (url.pathname === "/create-order" && method === "POST") {
       data = { raw: text };
     }
 
+    console.log("📤 Delhivery response:", data);
+
     return Response.json(data, { headers: corsHeaders });
+
   } catch (err) {
-    console.error("❌ /create-order failed:", err);
+    console.error("❌ Create order error:", err);
     return Response.json(
       { error: "Create Order Failed", details: err.message },
       { status: 500, headers: corsHeaders }
