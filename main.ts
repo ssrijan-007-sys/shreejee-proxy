@@ -143,7 +143,6 @@ if (url.pathname === "/create-order" && method === "POST") {
           },
         }
       );
-    
 
       const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
@@ -171,16 +170,7 @@ if (url.pathname === "/create-order" && method === "POST") {
         }
       );
 
-      const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
-
-    console.log("📤 Delhivery response:", data);
-    
+      const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
     } catch (err) {
       return Response.json(
@@ -193,59 +183,75 @@ if (url.pathname === "/create-order" && method === "POST") {
   /* ==============================
      UPDATE SHIPMENT
   ============================== */
-  // EDIT SHIPMENT
-if (req.url.includes("/edit-shipment")) {
-  const body = await req.json();
-
-  const res = await fetch("https://staging-express.delhivery.com/api/p/edit", {
-    method: "POST",
-    headers: {
-      "Authorization": `Token ${DENO_DELHIVERY_TOKEN}`,
-      "Accept": "application/json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-  const text = await response.text();
-    let data;
+  if (url.pathname === "/update-shipment" && method === "POST") {
     try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
+      const body = await req.json();
+
+      const response = await fetch(
+        "https://track.delhivery.com/api/p/edit",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${DELHIVERY_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      const data = await response.json();
+      return Response.json(data, { headers: corsHeaders });
+    } catch (err) {
+      return Response.json(
+        { error: "Shipment update failed", details: err.message },
+        { status: 500, headers: corsHeaders }
+      );
     }
+  }
 
-    console.log("📤 Delhivery response:", data);
+  /* ==============================
+     CANCEL SHIPMENT
+  ============================== */
+  /* ==============================
+   CANCEL SHIPMENT
+============================== */
+if (url.pathname === "/cancel-shipment" && method === "POST") {
+  try {
+    const body = await req.json();
 
-  return new Response(await res.text(), {headers: {"content-type":"application/json"}});
+    const response = await fetch(
+      "https://track.delhivery.com/api/p/edit",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${DELHIVERY_API_KEY}`,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        body: JSON.stringify({
+          waybill: body.waybill,
+          cancellation: "true"
+        }),
+      }
+    );
+
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } 
+    catch { data = { raw: text }; }
+
+    console.log("❌ Cancel response:", data);
+
+    return Response.json(data, { headers: corsHeaders });
+
+  } catch (err) {
+    return Response.json(
+      { error: "Cancel shipment failed", details: err.message },
+      { status: 500, headers: corsHeaders }
+    );
+  }
 }
 
-
-// CANCEL SHIPMENT
-if (req.url.includes("/cancel-shipment")) {
-  const body = await req.json();
-
-  const res = await fetch("https://staging-express.delhivery.com/api/p/edit", {
-    method: "POST",
-    headers: {
-      "Authorization": `Token ${DENO_DELHIVERY_TOKEN}`,
-      "Accept": "application/json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ waybill: body.waybill, cancellation: "true" })
-  });
-
-  const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
-
-    console.log("📤 Delhivery response:", data);
-  return new Response(await res.text(), {headers: {"content-type":"application/json"}});
-}
 
   return new Response("Not Found", { status: 404, headers: corsHeaders });
 });
