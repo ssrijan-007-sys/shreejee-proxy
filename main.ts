@@ -143,15 +143,7 @@ if (url.pathname === "/create-order" && method === "POST") {
           },
         }
       );
-      const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
-
-    console.log("📤 Delhivery response:", data);
+    
 
       const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
@@ -189,7 +181,6 @@ if (url.pathname === "/create-order" && method === "POST") {
 
     console.log("📤 Delhivery response:", data);
 
-      const data = await response.json();
       return Response.json(data, { headers: corsHeaders });
     } catch (err) {
       return Response.json(
