@@ -180,7 +180,7 @@ if (url.pathname === "/create-order" && method === "POST") {
     }
 
     console.log("📤 Delhivery response:", data);
-
+    
       return Response.json(data, { headers: corsHeaders });
     } catch (err) {
       return Response.json(
@@ -207,6 +207,16 @@ if (req.url.includes("/edit-shipment")) {
     body: JSON.stringify(body)
   });
 
+  const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+
+    console.log("📤 Delhivery response:", data);
+
   return new Response(await res.text(), {headers: {"content-type":"application/json"}});
 }
 
@@ -225,6 +235,15 @@ if (req.url.includes("/cancel-shipment")) {
     body: JSON.stringify({ waybill: body.waybill, cancellation: "true" })
   });
 
+  const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
+
+    console.log("📤 Delhivery response:", data);
   return new Response(await res.text(), {headers: {"content-type":"application/json"}});
 }
 
