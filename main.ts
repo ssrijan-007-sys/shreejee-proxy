@@ -1,6 +1,10 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import "https://deno.land/x/dotenv/load.ts";
+import { fbGet, fbPatch, fbSet } from "./firebase-rest.ts";
+import { normalizeDelhiveryStatus } from "./tracking-utils.ts";
+import { adminDb } from "./firebase-admin.ts";
+
 
 
 const DELHIVERY_API_KEY = Deno.env.get("DELHIVERY_API_KEY");
@@ -10,43 +14,82 @@ if (!DELHIVERY_API_KEY) {
 }
 
 Deno.cron("Track Shipments", "*/4 * * * *", async () => {
-  console.log("⏱ Running tracking cron");
+  console.log("⏱ Tracking cron running");
 
-  // 1️⃣ Fetch active shipments from Firebase (pseudo)
-  // statuses NOT IN: Delivered, RTO
-  const activeOrders = await fetchActiveOrdersFromFirebase();
+  try {
+    const telecallers = await fbGet("Telecallers");
+    if (!telecallers) return;
 
-  // 2️⃣ Chunk by 50 (Delhivery limit)
-  const chunks = chunkArray(activeOrders, 50);
+    const activeOrders: any[] = [];
 
-  for (const batch of chunks) {
-    const waybills = batch.map(o => o.awb).join(",");
-
-    const res = await fetch(
-      `${DENO_URL}/track?waybills=${waybills}`
-    );
-    const data = await res.json();
-
-    // 3️⃣ Parse & update Firebase
-    for (const pkg of data?.ShipmentData || []) {
-      const latestStatus = pkg?.Shipment?.Status?.Status;
-
-      await updateOrderStatusInFirebase(
-        pkg?.Shipment?.Waybill,
-        latestStatus,
-        pkg
-      );
+    for (const tc of Object.values(telecallers)) {
+      for (const phoneGroup of Object.values(tc.Orders || {})) {
+        for (const order of Object.values(phoneGroup as any)) {
+          if (
+            order.awb &&
+            !["DELIVERED", "RTO - RETURNED", "CANCELLED"].includes(order.status)
+          ) {
+            activeOrders.push(order);
+          }
+        }
+      }
     }
-  }
-  await set(
-  ref(db, `Tracking/${waybill}`),
-  {
-    lastUpdated: Date.now(),
-    status: normalizedStatus,
-    scans: pkg?.Shipment?.Scans || []
-  }
-);
 
+    if (!activeOrders.length) return;
+
+    for (let i = 0; i < activeOrders.length; i += 50) {
+      const batch = activeOrders.slice(i, i + 50);
+      const waybills = batch.map(o => o.awb).join(",");
+
+      const res = await fetch(
+        `https://track.delhivery.com/api/v1/packages/json/?waybill=${waybills}`,
+        {
+          headers: {
+            Authorization: `Token ${Deno.env.get("DELHIVERY_API_KEY")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      for (const pkg of data?.ShipmentData || []) {
+        const awb = pkg?.Shipment?.Waybill;
+        const rawStatus = pkg?.Shipment?.Status?.Status;
+        const scans = pkg?.Shipment?.Scans || [];
+
+        const status = normalizeDelhiveryStatus(rawStatus);
+
+        // 🔄 Update orders
+        for (const tcKey of Object.keys(telecallers)) {
+          const orders = telecallers[tcKey].Orders || {};
+
+          for (const phone of Object.keys(orders)) {
+            for (const orderId of Object.keys(orders[phone])) {
+              if (orders[phone][orderId].awb === awb) {
+                await fbPatch(
+                  `Telecallers/${tcKey}/Orders/${phone}/${orderId}`,
+                  {
+                    status,
+                    lastTrackedAt: Date.now(),
+                  }
+                );
+
+                await fbSet(`Tracking/${awb}`, {
+                  status,
+                  scans,
+                  updatedAt: Date.now(),
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error("❌ Tracking cron failed:", err);
+  }
 });
 
 
