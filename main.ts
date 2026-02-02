@@ -9,34 +9,7 @@ if (!DELHIVERY_API_KEY) {
   console.error("❌ DELHIVERY_API_KEY not found");
 }
 
-/* ==============================
-   CORS HEADERS
-============================== */
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-serve(async (req) => {
-  // Handle preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  const url = new URL(req.url);
-  const method = req.method;
-
-  /* ==============================
-     HEALTH CHECK
-  ============================== */
-  if (url.pathname === "/" && method === "GET") {
-    return new Response("ShreeJee Delhivery Proxy Running Successfully✅", {
-      headers: corsHeaders,
-    });
-  }
-
-  Deno.cron("Track Shipments", "*/4 * * * *", async () => {
+Deno.cron("Track Shipments", "*/4 * * * *", async () => {
   console.log("⏱ Running tracking cron");
 
   // 1️⃣ Fetch active shipments from Firebase (pseudo)
@@ -76,6 +49,34 @@ serve(async (req) => {
 
 });
 
+
+
+/* ==============================
+   CORS HEADERS
+============================== */
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+serve(async (req) => {
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const url = new URL(req.url);
+  const method = req.method;
+
+  /* ==============================
+     HEALTH CHECK
+  ============================== */
+  if (url.pathname === "/" && method === "GET") {
+    return new Response("ShreeJee Delhivery Proxy Running Successfully✅", {
+      headers: corsHeaders,
+    });
+  }
 
  // ==============================
 // FETCH WAYBILLS (BULK)
