@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import "https://deno.land/x/dotenv/load.ts";
+
 
 const DELHIVERY_API_KEY = Deno.env.get("DELHIVERY_API_KEY");
 
@@ -33,6 +35,47 @@ serve(async (req) => {
       headers: corsHeaders,
     });
   }
+
+  Deno.cron("Track Shipments", "*/4 * * * *", async () => {
+  console.log("⏱ Running tracking cron");
+
+  // 1️⃣ Fetch active shipments from Firebase (pseudo)
+  // statuses NOT IN: Delivered, RTO
+  const activeOrders = await fetchActiveOrdersFromFirebase();
+
+  // 2️⃣ Chunk by 50 (Delhivery limit)
+  const chunks = chunkArray(activeOrders, 50);
+
+  for (const batch of chunks) {
+    const waybills = batch.map(o => o.awb).join(",");
+
+    const res = await fetch(
+      `${DENO_URL}/track?waybills=${waybills}`
+    );
+    const data = await res.json();
+
+    // 3️⃣ Parse & update Firebase
+    for (const pkg of data?.ShipmentData || []) {
+      const latestStatus = pkg?.Shipment?.Status?.Status;
+
+      await updateOrderStatusInFirebase(
+        pkg?.Shipment?.Waybill,
+        latestStatus,
+        pkg
+      );
+    }
+  }
+  await set(
+  ref(db, `Tracking/${waybill}`),
+  {
+    lastUpdated: Date.now(),
+    status: normalizedStatus,
+    scans: pkg?.Shipment?.Scans || []
+  }
+);
+
+});
+
 
  // ==============================
 // FETCH WAYBILLS (BULK)
@@ -154,31 +197,43 @@ if (url.pathname === "/create-order" && method === "POST") {
     }
   }
 
-  /* ==============================
-     TRACK SHIPMENT
-  ============================== */
-  if (url.pathname.startsWith("/track/") && method === "GET") {
-    try {
-      const awb = url.pathname.split("/")[2];
+/* ==============================
+   TRACK SHIPMENTS (SINGLE / BULK)
+============================== */
+if (url.pathname === "/track" && method === "GET") {
+  try {
+    const waybills = url.searchParams.get("waybills"); // comma separated
+    const orderIds = url.searchParams.get("order_ids"); // optional
 
-      const response = await fetch(
-        `https://track.delhivery.com/api/v1/packages/json/?waybill=${awb}`,
-        {
-          headers: {
-            Authorization: `Token ${DELHIVERY_API_KEY}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      return Response.json(data, { headers: corsHeaders });
-    } catch (err) {
+    if (!waybills && !orderIds) {
       return Response.json(
-        { error: "Tracking failed", details: err.message },
-        { status: 500, headers: corsHeaders }
+        { error: "waybills or order_ids required" },
+        { status: 400, headers: corsHeaders }
       );
     }
+
+    const response = await fetch(
+      `https://track.delhivery.com/api/v1/packages/json/?` +
+        `waybill=${waybills || ""}&ref_ids=${orderIds || ""}`,
+      {
+        headers: {
+          Authorization: `Token ${DELHIVERY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+    return Response.json(data, { headers: corsHeaders });
+
+  } catch (err) {
+    return Response.json(
+      { error: "Tracking failed", details: err.message },
+      { status: 500, headers: corsHeaders }
+    );
   }
+}
+
 
   /* ==============================
      UPDATE SHIPMENT
