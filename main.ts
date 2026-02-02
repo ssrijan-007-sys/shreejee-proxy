@@ -3,7 +3,6 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import "https://deno.land/x/dotenv/load.ts";
 import { fbGet, fbPatch, fbSet } from "./firebase-rest.ts";
 import { normalizeDelhiveryStatus } from "./tracking-utils.ts";
-import { adminDb } from "./firebase-admin.ts";
 
 
 
