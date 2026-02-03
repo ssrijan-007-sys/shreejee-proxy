@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import "https://deno.land/x/dotenv/load.ts";
-import { fbGet, fbPatch, fbSet } from "./firebase-rest.ts";
 import { normalizeDelhiveryStatus } from "./tracking-utils.ts";
 
 
@@ -353,3 +352,4 @@ if (url.pathname === "/cancel-shipment" && method === "POST") {
 
   return new Response("Not Found", { status: 404, headers: corsHeaders });
 });
+
